@@ -16,7 +16,7 @@ This repo is intentionally optimized for **system design tradeoffs, boundaries, 
 ## Non-goals
 
 - Academic ML training pipelines
-- Heavy UI
+- Heavy UI (we may add a **small React “review console”**, but no complex product UI)
 - Microservices/k8s “because it’s cool”
 - LeetCode-style problems
 
@@ -66,6 +66,11 @@ This repo is intentionally optimized for **system design tradeoffs, boundaries, 
   - Routes `DecisionRecord` to sinks: CLI output, REST API response, email/Discord/Slack webhook.
   - Ensures idempotency: “don’t notify twice for same decision.”
 
+- **Web UI (React review console)**
+  - Read-only (or minimally write) UI for exploring signals, context, and decisions.
+  - Focused on: search/filter, timelines, decision detail pages, and “why” explanations.
+  - Talks to the system via a thin **HTTP API**; no business logic in the frontend.
+
 - **Observability & Ops**
   - Structured logs with correlation ids; minimal metrics (ingest lag, error rates, LLM calls).
   - Dead-letter handling for failed events; replay support.
@@ -84,6 +89,9 @@ flowchart LR
   H --> I[Outputs\nCLI/API/Notifications]
   G -. optional .-> J[LLM Adapter\nprovider-agnostic]
   J --> G
+  K[HTTP API\nQuery: events/decisions] --> G
+  K --> E
+  L[React Web UI\nReview Console] --> K
 ```
 
 ## Canonical Data Contracts (first-class)
@@ -127,6 +135,33 @@ The project is easiest to evolve if you enforce these boundaries early:
 - **`llm/`**: provider adapters + prompt templating utilities + mock provider.
 - **`actions/`**: sinks (CLI, HTTP API, webhooks) + idempotency.
 - **`runtime/`**: orchestration (scheduler/worker), config, dependency wiring.
+
+## Architectural Choices (technologies)
+
+These choices prioritize clarity, low cost, and strong architectural boundaries over hype.
+
+- **Fastify (API)**
+  - Minimal, fast HTTP server with clear routing and good TypeScript ergonomics.
+  - Keeps the API explicit and lightweight for a small MVP.
+
+- **SQLite (storage)**
+  - Zero-config local database, ideal for a single-user MVP.
+  - Easy upgrade path to Postgres later without changing boundaries.
+  - Data persists to a local file (`sda.sqlite` by default), so state survives restarts.
+
+- **React + Vite (web UI)**
+  - Lightweight front-end for a small interactive “review console.”
+  - Fast local iteration with minimal build config.
+
+- **Zod (runtime validation)**
+  - Validates API inputs at the boundary to keep the decision logic predictable.
+
+- **Stooq CSV (market data)**
+  - Free daily close data for ETFs, no auth required.
+  - “Good enough” for drift monitoring in a zero-budget project.
+
+- **Rules-first decision engine**
+  - Deterministic and testable; LLMs (optional) are behind an adapter and used for summarization only.
 
 ## Key Tradeoffs (and why)
 
@@ -223,6 +258,38 @@ When you say “go”, we’ll scaffold:
 - a minimal CLI runner
 - SQLite schema + migrations
 - two connectors (RSS + REST) with fixture-based tests
+
+## Local development
+
+### Prerequisites
+
+- Node 20+
+- npm 10+
+
+### Install
+
+```bash
+npm install
+```
+
+### Run (API + Web)
+
+```bash
+# terminal 1
+npm run dev:api
+
+# terminal 2
+npm run dev:web
+```
+
+Open `http://localhost:5173` to use the React review console.
+
+### Demo flow (ETF MVP)
+
+1. Add ETFs (e.g., `SPY`, `QQQ`, `VXUS`) with shares + target weights.
+2. Click **Refresh prices** to pull latest daily close (Stooq).
+3. Click **Run decisions** to generate drift alerts.
+4. In **Decision Inbox**, set status to `ack`, `snoozed`, `dismissed`, or `done`.
 
 ---
 
