@@ -57,4 +57,3 @@ export function migrate(db: Db) {
     JSON.stringify({ pct: 0.05 }) // 5% absolute delta
   );
 }
-

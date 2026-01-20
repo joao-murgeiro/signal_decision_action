@@ -36,4 +36,3 @@ export type DecisionRow = {
   created_at: string;
   updated_at: string;
 };
-

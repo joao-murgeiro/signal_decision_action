@@ -60,4 +60,3 @@ export async function fetchLatestDailyCloseUsd(symbolUpper: string): Promise<{ d
 
   return { date, close };
 }
-

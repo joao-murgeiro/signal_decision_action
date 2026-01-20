@@ -34,6 +34,7 @@ export default function App() {
   const [decisions, setDecisions] = useState<Decision[]>([]);
   const [loading, setLoading] = useState(false);
   const [priceResults, setPriceResults] = useState<PriceRefreshResult[] | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const [form, setForm] = useState({
     symbol: "",
@@ -72,13 +73,15 @@ export default function App() {
 
   async function addHolding(e: React.FormEvent) {
     e.preventDefault();
+    setFormError(null);
     setLoading(true);
     try {
+      const symbol = form.symbol.trim().toUpperCase();
       const res = await fetch("/api/holdings", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          symbol: form.symbol,
+          symbol,
           name: form.name || null,
           shares: Number(form.shares),
           targetWeight: Number(form.targetWeight)
@@ -86,7 +89,15 @@ export default function App() {
       });
       if (!res.ok) {
         const err = await res.json();
-        alert(`Failed to add: ${err?.error ?? res.status}`);
+        const message =
+          err?.error === "symbol_not_allowed"
+            ? "Symbol not allowed. Use a US-listed ETF ticker (e.g., SPY, VOO, IVV)."
+            : err?.error === "symbol_list_unavailable"
+            ? "Symbol list is temporarily unavailable. Please try again."
+            : err?.error === "symbol_already_exists"
+            ? "That symbol already exists in your holdings."
+            : `Failed to add: ${err?.error ?? res.status}`;
+        setFormError(message);
       } else {
         setForm({ symbol: "", name: "", shares: "10", targetWeight: "0.2" });
         await loadHoldings();
@@ -147,7 +158,7 @@ export default function App() {
       <header className="header">
         <div>
           <h1>Portfolio Sentinel</h1>
-          <p>ETFs-only MVP: add holdings, refresh prices, run drift decisions.</p>
+          <p>US-based ETFs-only MVP: add holdings, refresh prices, run drift decisions.</p>
         </div>
         <div className="actions">
           <button onClick={() => void refreshPrices()} disabled={loading}>
@@ -208,6 +219,7 @@ export default function App() {
                 Add holding
               </button>
             </div>
+            {formError && <div className="form-error">{formError}</div>}
           </form>
 
           <div className="meta">
