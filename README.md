@@ -140,9 +140,15 @@ The project is easiest to evolve if you enforce these boundaries early:
 
 These choices prioritize clarity, low cost, and strong architectural boundaries over hype.
 
+- **TypeScript (backend)**
+  - Provides static typing on the server, catching API/data-shape issues earlier than runtime.
+  - Shares types across layers and improves refactoring safety as the model evolves.
+  - Runs on Node.js, which keeps tooling and language consistent across front and back.
+
 - **Fastify (API)**
   - Minimal, fast HTTP server with clear routing and good TypeScript ergonomics.
   - Keeps the API explicit and lightweight for a small MVP.
+  - Built-in schema hooks and plugin model make validation and extension straightforward.
 
 - **SQLite (storage)**
   - Zero-config local database, ideal for a single-user MVP.

@@ -40,7 +40,7 @@ export default function App() {
     symbol: "",
     name: "",
     shares: "10",
-    targetWeight: "0.2"
+    targetPercent: "20"
   });
 
   const [decisionFilter, setDecisionFilter] = useState<Decision["status"] | "all">("all");
@@ -84,7 +84,7 @@ export default function App() {
           symbol,
           name: form.name || null,
           shares: Number(form.shares),
-          targetWeight: Number(form.targetWeight)
+          targetWeight: Number(form.targetPercent) / 100
         })
       });
       if (!res.ok) {
@@ -99,7 +99,7 @@ export default function App() {
             : `Failed to add: ${err?.error ?? res.status}`;
         setFormError(message);
       } else {
-        setForm({ symbol: "", name: "", shares: "10", targetWeight: "0.2" });
+        setForm({ symbol: "", name: "", shares: "10", targetPercent: "20" });
         await loadHoldings();
       }
     } finally {
@@ -158,7 +158,7 @@ export default function App() {
       <header className="header">
         <div>
           <h1>Portfolio Sentinel</h1>
-          <p>US-based ETFs-only MVP: add holdings, refresh prices, run drift decisions.</p>
+          <p>US-listed equities (mostly ETFs and Stocks) MVP: Add holdings, Refresh prices, Run decisions.</p>
         </div>
         <div className="actions">
           <button onClick={() => void refreshPrices()} disabled={loading}>
@@ -203,14 +203,14 @@ export default function App() {
               />
             </label>
             <label>
-              Target Weight (0..1)
+              Target % (0..100)
               <input
-                value={form.targetWeight}
-                onChange={(e) => setForm({ ...form, targetWeight: e.target.value })}
+                value={form.targetPercent}
+                onChange={(e) => setForm({ ...form, targetPercent: e.target.value })}
                 type="number"
-                step="0.01"
+                step="0.1"
                 min="0"
-                max="1"
+                max="100"
                 required
               />
             </label>
@@ -223,7 +223,7 @@ export default function App() {
           </form>
 
           <div className="meta">
-            Total target weight: <strong>{totals.totalTarget.toFixed(2)}</strong>
+            Total target %: <strong>{(totals.totalTarget * 100).toFixed(2)}</strong>
           </div>
 
           <table className="table">
@@ -231,7 +231,7 @@ export default function App() {
               <tr>
                 <th>Symbol</th>
                 <th>Shares</th>
-                <th>Target</th>
+                <th>Target %</th>
                 <th></th>
               </tr>
             </thead>
@@ -240,7 +240,7 @@ export default function App() {
                 <tr key={h.id}>
                   <td>{h.symbol}</td>
                   <td>{h.shares}</td>
-                  <td>{h.targetWeight.toFixed(2)}</td>
+                  <td>{(h.targetWeight * 100).toFixed(2)}</td>
                   <td>
                     <button onClick={() => void deleteHolding(h.id)} disabled={loading}>
                       Remove

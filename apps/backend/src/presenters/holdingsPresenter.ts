@@ -28,7 +28,15 @@ export async function createHolding(
     const id = holdingsModel.createHolding(db, input);
     return { status: 201, body: { id } };
   } catch (e: any) {
-    if (String(e?.message ?? "").includes("holdings_symbol_unique")) {
+    const message = String(e?.message ?? "");
+    const isUniqueConflict =
+      message.includes("holdings_symbol_unique") || message.includes("UNIQUE constraint failed: holdings.symbol");
+    if (isUniqueConflict) {
+      const changes = holdingsModel.incrementHolding(db, input.symbol, input.shares, input.targetWeight, input.name ?? null);
+      if (changes > 0) {
+        const id = holdingsModel.getHoldingIdBySymbol(db, input.symbol);
+        return { status: 200, body: { id: id ?? 0 } };
+      }
       return { status: 409, body: { error: "symbol_already_exists" } };
     }
     throw e;
