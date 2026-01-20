@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 type Holding = {
   id: number;
   symbol: string;
-  name?: string | null;
+  label?: string | null;
   shares: number;
   targetWeight: number;
   createdAt: string;
@@ -35,10 +35,11 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [priceResults, setPriceResults] = useState<PriceRefreshResult[] | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [labelDrafts, setLabelDrafts] = useState<Record<number, string>>({});
 
   const [form, setForm] = useState({
     symbol: "",
-    name: "",
+    label: "",
     shares: "10",
     targetPercent: "20"
   });
@@ -65,6 +66,7 @@ export default function App() {
 
   useEffect(() => {
     void loadHoldings();
+    void refreshPrices();
   }, []);
 
   useEffect(() => {
@@ -82,7 +84,7 @@ export default function App() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           symbol,
-          name: form.name || null,
+          label: form.label || null,
           shares: Number(form.shares),
           targetWeight: Number(form.targetPercent) / 100
         })
@@ -99,8 +101,9 @@ export default function App() {
             : `Failed to add: ${err?.error ?? res.status}`;
         setFormError(message);
       } else {
-        setForm({ symbol: "", name: "", shares: "10", targetPercent: "20" });
+        setForm({ symbol: "", label: "", shares: "10", targetPercent: "20" });
         await loadHoldings();
+        await refreshPrices();
       }
     } finally {
       setLoading(false);
@@ -153,6 +156,37 @@ export default function App() {
     }
   }
 
+  async function updateHoldingLabel(holding: Holding, label: string) {
+    setLoading(true);
+    try {
+      await fetch(`/api/holdings/${holding.id}`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          symbol: holding.symbol,
+          label: label.trim() || null,
+          shares: holding.shares,
+          targetWeight: holding.targetWeight
+        })
+      });
+      await loadHoldings();
+      setLabelDrafts((prev) => {
+        if (prev[holding.id] !== label) return prev;
+        const { [holding.id]: _removed, ...rest } = prev;
+        return rest;
+      });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function saveLabelOnBlur(holding: Holding, label: string) {
+    const nextLabel = label.trim();
+    const currentLabel = holding.label ?? "";
+    if (nextLabel === currentLabel) return;
+    void updateHoldingLabel(holding, label);
+  }
+
   return (
     <div className="page">
       <header className="header">
@@ -184,10 +218,10 @@ export default function App() {
               />
             </label>
             <label>
-              Name
+              Label (optional)
               <input
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                value={form.label}
+                onChange={(e) => setForm({ ...form, label: e.target.value })}
                 placeholder="S&P 500 ETF"
               />
             </label>
@@ -230,27 +264,44 @@ export default function App() {
             <thead>
               <tr>
                 <th>Symbol</th>
+                <th>Label</th>
                 <th>Shares</th>
                 <th>Target %</th>
                 <th></th>
               </tr>
             </thead>
             <tbody>
-              {holdings.map((h) => (
-                <tr key={h.id}>
-                  <td>{h.symbol}</td>
-                  <td>{h.shares}</td>
-                  <td>{(h.targetWeight * 100).toFixed(2)}</td>
-                  <td>
-                    <button onClick={() => void deleteHolding(h.id)} disabled={loading}>
-                      Remove
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {holdings.map((h) => {
+                const draftLabel = labelDrafts[h.id] ?? h.label ?? "";
+                return (
+                  <tr key={h.id}>
+                    <td>{h.symbol}</td>
+                    <td>
+                      <input
+                        value={draftLabel}
+                        onChange={(e) => {
+                          const nextValue = e.target.value;
+                          setLabelDrafts((prev) => ({ ...prev, [h.id]: nextValue }));
+                        }}
+                        onBlur={(e) => {
+                          saveLabelOnBlur(h, e.target.value);
+                        }}
+                        placeholder="-"
+                      />
+                    </td>
+                    <td>{h.shares}</td>
+                    <td>{(h.targetWeight * 100).toFixed(2)}</td>
+                    <td>
+                      <button onClick={() => void deleteHolding(h.id)} disabled={loading}>
+                        Remove
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
               {holdings.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="empty">
+                  <td colSpan={5} className="empty">
                     No holdings yet.
                   </td>
                 </tr>
@@ -308,7 +359,7 @@ export default function App() {
       </section>
 
       {priceResults && (
-        <section className="card">
+        <section className="card card-spaced">
           <h2>Latest Price Refresh</h2>
           <table className="table">
             <thead>

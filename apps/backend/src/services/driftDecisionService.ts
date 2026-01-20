@@ -17,6 +17,7 @@ type DriftDecision = {
   portfolioValue: number;
 };
 
+// Evaluate portfolio drift and create decision records.
 export function runDriftDecisions(db: Db): { created: number; evaluated: number } {
   const holdings = holdingsModel.listHoldings(db);
   if (holdings.length === 0) return { created: 0, evaluated: 0 };

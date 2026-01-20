@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const HoldingInputSchema = z.object({
   symbol: z.string().trim().min(1).max(12).transform((s) => s.toUpperCase()),
-  name: z.string().trim().max(120).optional().nullable(),
+  label: z.string().trim().max(120).optional().nullable(),
   shares: z.number().finite().positive(),
   targetWeight: z.number().finite().min(0).max(1)
 });

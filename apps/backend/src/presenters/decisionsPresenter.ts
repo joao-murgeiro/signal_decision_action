@@ -6,6 +6,7 @@ import { runDriftDecisions } from "../services/driftDecisionService.js";
 
 const DecisionStatusSchema = z.enum(["open", "ack", "snoozed", "dismissed", "done"]);
 
+// List decisions with optional status filter.
 export function listDecisions(db: Db, query: unknown) {
   const parsed = z
     .object({
@@ -25,6 +26,7 @@ export function listDecisions(db: Db, query: unknown) {
   }));
 }
 
+// Validate status input and update a decision row.
 export function updateDecisionStatus(db: Db, id: number, body: unknown) {
   const parsed = z
     .object({
@@ -36,6 +38,7 @@ export function updateDecisionStatus(db: Db, id: number, body: unknown) {
   return { updated };
 }
 
+// Run drift decision logic and return summary.
 export function runDecisions(db: Db) {
   return runDriftDecisions(db);
 }

@@ -1,5 +1,6 @@
 import type { Db } from "../db/db.js";
 
+// Read and validate the drift threshold setting.
 export function getDriftThreshold(db: Db): number {
   const row = db.prepare("select value_json from settings where key = ?").get("drift_threshold") as
     | { value_json: string }

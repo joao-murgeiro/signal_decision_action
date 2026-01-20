@@ -3,6 +3,7 @@ import * as holdingsModel from "../models/holdingsModel.js";
 import * as pricesModel from "../models/pricesModel.js";
 import { fetchLatestDailyCloseUsd } from "../services/stooqService.js";
 
+// Refresh latest prices for all holdings via Stooq.
 export async function refreshPrices(db: Db) {
   const symbols = holdingsModel.listHoldingSymbols(db);
   const uniqueSymbols = Array.from(new Set(symbols.map((h) => h.toUpperCase()))).sort();

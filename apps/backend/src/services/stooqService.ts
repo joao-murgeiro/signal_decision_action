@@ -15,6 +15,7 @@ const CsvResponseSchema = z.object({
 
 // Very small CSV parser for Stooq's simple, comma-separated format.
 // We trim lines, split the header, then map each line to a key/value record.
+// Parse Stooq CSV into a validated header/rows structure.
 function parseCsv(csv: string): { header: string[]; rows: Record<string, string>[] } {
   const lines = csv
     .split(/\r?\n/)
@@ -34,6 +35,7 @@ function parseCsv(csv: string): { header: string[]; rows: Record<string, string>
   return CsvResponseSchema.parse({ header, rows });
 }
 
+// Fetch the latest daily close from Stooq for a symbol.
 export async function fetchLatestDailyCloseUsd(symbolUpper: string): Promise<{ date: string; close: number }> {
   // Stooq uses lower-case symbol + .us for US tickers (ETFs included)
   const stooqSymbol = `${symbolUpper.toLowerCase()}.us`;

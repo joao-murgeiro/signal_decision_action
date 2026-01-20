@@ -8,6 +8,7 @@ type RouteDeps = {
   db: Db;
 };
 
+// Register HTTP routes and wire them to presenters.
 export function registerRoutes(app: FastifyInstance, deps: RouteDeps) {
   app.get("/api/health", async () => ({ ok: true }));
 
