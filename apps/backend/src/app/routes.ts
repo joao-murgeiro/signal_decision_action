@@ -56,7 +56,7 @@ export function registerRoutes(app: FastifyInstance, deps: RouteDeps) {
       reply.code(503);
       return { error: "llm_not_configured" };
     }
-    const res = await chatPresenter.chat(deps.llmClient, req.body);
+    const res = await chatPresenter.chat(deps.db, deps.llmClient, req.body);
     reply.code(res.status);
     return res.body;
   });

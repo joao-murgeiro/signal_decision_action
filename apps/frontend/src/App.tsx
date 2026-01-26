@@ -34,6 +34,79 @@ type ChatMessage = {
   content: string;
 };
 
+function renderInlineMarkdown(text: string) {
+  const nodes: React.ReactNode[] = [];
+  const pattern = /(\*\*[^*]+\*\*|`[^`]+`)/;
+  let remaining = text;
+  let key = 0;
+
+  while (remaining.length > 0) {
+    const match = remaining.match(pattern);
+    if (!match || match.index === undefined) {
+      nodes.push(remaining);
+      break;
+    }
+
+    if (match.index > 0) {
+      nodes.push(remaining.slice(0, match.index));
+    }
+
+    const token = match[0];
+    if (token.startsWith("**")) {
+      nodes.push(<strong key={`b-${key++}`}>{token.slice(2, -2)}</strong>);
+    } else {
+      nodes.push(<code key={`c-${key++}`}>{token.slice(1, -1)}</code>);
+    }
+
+    remaining = remaining.slice(match.index + token.length);
+  }
+
+  return nodes;
+}
+
+function renderChatContent(content: string) {
+  const lines = content.split(/\r?\n/);
+  const blocks: React.ReactNode[] = [];
+  let listItems: React.ReactNode[] = [];
+  let key = 0;
+
+  const flushList = () => {
+    if (listItems.length > 0) {
+      blocks.push(
+        <ul key={`list-${key++}`} className="chat-list">
+          {listItems}
+        </ul>
+      );
+      listItems = [];
+    }
+  };
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    const listMatch = /^(\d+\.|-|\*)\s+(.+)$/.exec(trimmed);
+    if (listMatch) {
+      const itemText = listMatch[2];
+      listItems.push(
+        <li key={`li-${key++}`}>{renderInlineMarkdown(itemText)}</li>
+      );
+      continue;
+    }
+
+    if (trimmed === "") {
+      flushList();
+      continue;
+    }
+
+    flushList();
+    blocks.push(
+      <p key={`p-${key++}`}>{renderInlineMarkdown(trimmed)}</p>
+    );
+  }
+
+  flushList();
+  return blocks;
+}
+
 export default function App() {
   const [holdings, setHoldings] = useState<Holding[]>([]);
   const [decisions, setDecisions] = useState<Decision[]>([]);
@@ -453,7 +526,7 @@ export default function App() {
           {chatMessages.map((msg, i) => (
             <div key={i} className={`chat-message chat-${msg.role}`}>
               <span className="chat-role">{msg.role === "user" ? "You" : "Assistant"}</span>
-              <div className="chat-content">{msg.content}</div>
+              <div className="chat-content">{renderChatContent(msg.content)}</div>
             </div>
           ))}
           {chatLoading && (
