@@ -189,6 +189,69 @@ button:disabled {
   padding: 16px;
 }
 
+/* Chat styles */
+.chat-messages {
+  max-height: 300px;
+  overflow-y: auto;
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.chat-message {
+  padding: 10px 12px;
+  border-radius: 10px;
+  max-width: 85%;
+}
+
+.chat-user {
+  background: #e0e7ff;
+  align-self: flex-end;
+}
+
+.chat-assistant {
+  background: #f3f4f6;
+  align-self: flex-start;
+}
+
+.chat-role {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: #6b7280;
+  margin-bottom: 4px;
+}
+
+.chat-content {
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.chat-loading {
+  color: #9ca3af;
+  font-style: italic;
+}
+
+.chat-form {
+  display: flex;
+  gap: 8px;
+}
+
+.chat-form input {
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.chat-form input:focus {
+  outline: 2px solid #6366f1;
+  outline-offset: -1px;
+}
+
 @media (max-width: 900px) {
   .grid {
     grid-template-columns: 1fr;

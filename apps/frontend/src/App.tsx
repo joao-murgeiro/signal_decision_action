@@ -29,6 +29,11 @@ type PriceRefreshResult = {
 
 const statusOptions: Decision["status"][] = ["open", "ack", "snoozed", "dismissed", "done"];
 
+type ChatMessage = {
+  role: "user" | "assistant";
+  content: string;
+};
+
 export default function App() {
   const [holdings, setHoldings] = useState<Holding[]>([]);
   const [decisions, setDecisions] = useState<Decision[]>([]);
@@ -45,6 +50,12 @@ export default function App() {
   });
 
   const [decisionFilter, setDecisionFilter] = useState<Decision["status"] | "all">("all");
+
+  // Chat state
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [chatLoading, setChatLoading] = useState(false);
+  const [chatError, setChatError] = useState<string | null>(null);
 
   const totals = useMemo(() => {
     const totalTarget = holdings.reduce((sum, h) => sum + (Number(h.targetWeight) || 0), 0);
@@ -187,8 +198,40 @@ export default function App() {
     void updateHoldingLabel(holding, label);
   }
 
-  return (
-    <div className="page">
+  async function sendChat(e: React.FormEvent) {
+    e.preventDefault();
+    const message = chatInput.trim();
+    if (!message) return;
+
+    setChatError(null);
+    setChatLoading(true);
+    setChatMessages((prev) => [...prev, { role: "user", content: message }]);
+    setChatInput("");
+
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ message })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        const errorMsg = data?.error === "llm_not_configured"
+          ? "Chat not configured. Set GEMINI_API_KEY on the server."
+          : data?.error ?? `Error ${res.status}`;
+        setChatError(errorMsg);
+      } else {
+        setChatMessages((prev) => [...prev, { role: "assistant", content: data.reply }]);
+      }
+    } catch (err) {
+      setChatError("Network error");
+    } finally {
+      setChatLoading(false);
+    }
+  }
+
+  function renderHeader() {
+    return (
       <header className="header">
         <div>
           <h1>Portfolio Sentinel</h1>
@@ -203,186 +246,252 @@ export default function App() {
           </button>
         </div>
       </header>
+    );
+  }
 
-      <section className="grid">
-        <div className="card">
-          <h2>Holdings</h2>
-          <form className="form" onSubmit={(e) => void addHolding(e)}>
-            <label>
-              Symbol
-              <input
-                value={form.symbol}
-                onChange={(e) => setForm({ ...form, symbol: e.target.value })}
-                placeholder="SPY"
-                required
-              />
-            </label>
-            <label>
-              Label (optional)
-              <input
-                value={form.label}
-                onChange={(e) => setForm({ ...form, label: e.target.value })}
-                placeholder="S&P 500 ETF"
-              />
-            </label>
-            <label>
-              Shares
-              <input
-                value={form.shares}
-                onChange={(e) => setForm({ ...form, shares: e.target.value })}
-                type="number"
-                step="0.01"
-                min="0"
-                required
-              />
-            </label>
-            <label>
-              Target % (0..100)
-              <input
-                value={form.targetPercent}
-                onChange={(e) => setForm({ ...form, targetPercent: e.target.value })}
-                type="number"
-                step="0.1"
-                min="0"
-                max="100"
-                required
-              />
-            </label>
-            <div className="form-actions">
-              <button type="submit" disabled={loading}>
-                Add holding
-              </button>
-            </div>
-            {formError && <div className="form-error">{formError}</div>}
-          </form>
-
-          <div className="meta">
-            Total target %: <strong>{(totals.totalTarget * 100).toFixed(2)}</strong>
-          </div>
-
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Symbol</th>
-                <th>Label</th>
-                <th>Shares</th>
-                <th>Target %</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {holdings.map((h) => {
-                const draftLabel = labelDrafts[h.id] ?? h.label ?? "";
-                return (
-                  <tr key={h.id}>
-                    <td>{h.symbol}</td>
-                    <td>
-                      <input
-                        value={draftLabel}
-                        onChange={(e) => {
-                          const nextValue = e.target.value;
-                          setLabelDrafts((prev) => ({ ...prev, [h.id]: nextValue }));
-                        }}
-                        onBlur={(e) => {
-                          saveLabelOnBlur(h, e.target.value);
-                        }}
-                        placeholder="-"
-                      />
-                    </td>
-                    <td>{h.shares}</td>
-                    <td>{(h.targetWeight * 100).toFixed(2)}</td>
-                    <td>
-                      <button onClick={() => void deleteHolding(h.id)} disabled={loading}>
-                        Remove
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-              {holdings.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="empty">
-                    No holdings yet.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="card">
-          <h2>Decision Inbox</h2>
-          <div className="toolbar">
-            <label>
-              Filter
-              <select value={decisionFilter} onChange={(e) => setDecisionFilter(e.target.value as any)}>
-                <option value="all">All</option>
-                {statusOptions.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button onClick={() => void loadDecisions()} disabled={loading}>
-              Refresh
+  function renderHoldingsCard() {
+    return (
+      <div className="card">
+        <h2>Holdings</h2>
+        <form className="form" onSubmit={(e) => void addHolding(e)}>
+          <label>
+            Symbol
+            <input
+              value={form.symbol}
+              onChange={(e) => setForm({ ...form, symbol: e.target.value })}
+              placeholder="SPY"
+              required
+            />
+          </label>
+          <label>
+            Label (optional)
+            <input
+              value={form.label}
+              onChange={(e) => setForm({ ...form, label: e.target.value })}
+              placeholder="S&P 500 ETF"
+            />
+          </label>
+          <label>
+            Shares
+            <input
+              value={form.shares}
+              onChange={(e) => setForm({ ...form, shares: e.target.value })}
+              type="number"
+              step="0.01"
+              min="0"
+              required
+            />
+          </label>
+          <label>
+            Target % (0..100)
+            <input
+              value={form.targetPercent}
+              onChange={(e) => setForm({ ...form, targetPercent: e.target.value })}
+              type="number"
+              step="0.1"
+              min="0"
+              max="100"
+              required
+            />
+          </label>
+          <div className="form-actions">
+            <button type="submit" disabled={loading}>
+              Add holding
             </button>
           </div>
+          {formError && <div className="form-error">{formError}</div>}
+        </form>
 
-          <ul className="list">
-            {decisions.map((d) => (
-              <li key={d.id} className="list-item">
-                <div className="list-main">
-                  <div className="list-title">{d.rationale}</div>
-                  <div className="list-meta">
-                    <span>{d.decisionType}</span>
-                    <span>Status: {d.status}</span>
-                    <span>{new Date(d.createdAt).toLocaleString()}</span>
-                  </div>
-                </div>
-                <div className="list-actions">
-                  {statusOptions.map((s) => (
-                    <button
-                      key={s}
-                      onClick={() => void updateDecisionStatus(d.id, s)}
-                      disabled={loading || d.status === s}
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
-              </li>
-            ))}
-            {decisions.length === 0 && <li className="empty">No decisions yet.</li>}
-          </ul>
+        <div className="meta">
+          Total target %: <strong>{(totals.totalTarget * 100).toFixed(2)}</strong>
         </div>
+
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Symbol</th>
+              <th>Label</th>
+              <th>Shares</th>
+              <th>Target %</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {holdings.map((h) => {
+              const draftLabel = labelDrafts[h.id] ?? h.label ?? "";
+              return (
+                <tr key={h.id}>
+                  <td>{h.symbol}</td>
+                  <td>
+                    <input
+                      value={draftLabel}
+                      onChange={(e) => {
+                        const nextValue = e.target.value;
+                        setLabelDrafts((prev) => ({ ...prev, [h.id]: nextValue }));
+                      }}
+                      onBlur={(e) => {
+                        saveLabelOnBlur(h, e.target.value);
+                      }}
+                      placeholder="-"
+                    />
+                  </td>
+                  <td>{h.shares}</td>
+                  <td>{(h.targetWeight * 100).toFixed(2)}</td>
+                  <td>
+                    <button onClick={() => void deleteHolding(h.id)} disabled={loading}>
+                      Remove
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+            {holdings.length === 0 && (
+              <tr>
+                <td colSpan={5} className="empty">
+                  No holdings yet.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+
+  function renderDecisionInboxCard() {
+    return (
+      <div className="card">
+        <h2>Decision Inbox</h2>
+        <div className="toolbar">
+          <label>
+            Filter
+            <select
+              value={decisionFilter}
+              onChange={(e) => setDecisionFilter(e.target.value as Decision["status"] | "all")}
+            >
+              <option value="all">All</option>
+              {statusOptions.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button onClick={() => void loadDecisions()} disabled={loading}>
+            Refresh
+          </button>
+        </div>
+
+        <ul className="list">
+          {decisions.map((d) => (
+            <li key={d.id} className="list-item">
+              <div className="list-main">
+                <div className="list-title">{d.rationale}</div>
+                <div className="list-meta">
+                  <span>{d.decisionType}</span>
+                  <span>Status: {d.status}</span>
+                  <span>{new Date(d.createdAt).toLocaleString()}</span>
+                </div>
+              </div>
+              <div className="list-actions">
+                {statusOptions.map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => void updateDecisionStatus(d.id, s)}
+                    disabled={loading || d.status === s}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            </li>
+          ))}
+          {decisions.length === 0 && <li className="empty">No decisions yet.</li>}
+        </ul>
+      </div>
+    );
+  }
+
+  function renderLatestPriceRefresh() {
+    if (!priceResults) return null;
+
+    return (
+      <section className="card card-spaced">
+        <h2>Latest Price Refresh</h2>
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Symbol</th>
+              <th>Status</th>
+              <th>Close</th>
+              <th>Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            {priceResults.map((r) => (
+              <tr key={r.symbol}>
+                <td>{r.symbol}</td>
+                <td>{r.ok ? "ok" : r.error}</td>
+                <td>{r.close?.toFixed(2) ?? "-"}</td>
+                <td>{r.date ?? "-"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+    );
+  }
+
+  function renderChatCard() {
+    return (
+      <div className="card card-spaced">
+        <h2>Chat Assistant</h2>
+        <div className="chat-messages">
+          {chatMessages.length === 0 && (
+            <div className="empty">Ask me anything about your portfolio.</div>
+          )}
+          {chatMessages.map((msg, i) => (
+            <div key={i} className={`chat-message chat-${msg.role}`}>
+              <span className="chat-role">{msg.role === "user" ? "You" : "Assistant"}</span>
+              <div className="chat-content">{msg.content}</div>
+            </div>
+          ))}
+          {chatLoading && (
+            <div className="chat-message chat-assistant">
+              <span className="chat-role">Assistant</span>
+              <div className="chat-content chat-loading">Thinking...</div>
+            </div>
+          )}
+        </div>
+        {chatError && <div className="form-error">{chatError}</div>}
+        <form className="chat-form" onSubmit={(e) => void sendChat(e)}>
+          <input
+            type="text"
+            value={chatInput}
+            onChange={(e) => setChatInput(e.target.value)}
+            placeholder="Type a message..."
+            disabled={chatLoading}
+          />
+          <button type="submit" disabled={chatLoading || !chatInput.trim()}>
+            Send
+          </button>
+        </form>
+      </div>
+    );
+  }
+
+  return (
+    <div className="page">
+      {renderHeader()}
+
+      <section className="grid">
+        {renderHoldingsCard()}
+        {renderDecisionInboxCard()}
       </section>
 
-      {priceResults && (
-        <section className="card card-spaced">
-          <h2>Latest Price Refresh</h2>
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Symbol</th>
-                <th>Status</th>
-                <th>Close</th>
-                <th>Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              {priceResults.map((r) => (
-                <tr key={r.symbol}>
-                  <td>{r.symbol}</td>
-                  <td>{r.ok ? "ok" : r.error}</td>
-                  <td>{r.close?.toFixed(2) ?? "-"}</td>
-                  <td>{r.date ?? "-"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
-      )}
+      {renderLatestPriceRefresh()}
+
+      {renderChatCard()}
     </div>
   );
 }

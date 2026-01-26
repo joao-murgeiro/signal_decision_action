@@ -1,11 +1,14 @@
 import type { FastifyInstance } from "fastify";
 import type { Db } from "../db/db.js";
+import type { LlmClient } from "../llm/index.js";
 import * as holdingsPresenter from "../presenters/holdingsPresenter.js";
 import * as decisionsPresenter from "../presenters/decisionsPresenter.js";
 import * as pricesPresenter from "../presenters/pricesPresenter.js";
+import * as chatPresenter from "../presenters/chatPresenter.js";
 
 type RouteDeps = {
   db: Db;
+  llmClient: LlmClient | null;
 };
 
 // Register HTTP routes and wire them to presenters.
@@ -45,5 +48,16 @@ export function registerRoutes(app: FastifyInstance, deps: RouteDeps) {
   app.post("/api/decisions/:id/status", async (req) => {
     const id = Number((req.params as any).id);
     return decisionsPresenter.updateDecisionStatus(deps.db, id, req.body);
+  });
+
+  // Chat endpoint (LLM-powered)
+  app.post("/api/chat", async (req, reply) => {
+    if (!deps.llmClient) {
+      reply.code(503);
+      return { error: "llm_not_configured" };
+    }
+    const res = await chatPresenter.chat(deps.llmClient, req.body);
+    reply.code(res.status);
+    return res.body;
   });
 }
